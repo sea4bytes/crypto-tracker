@@ -55,9 +55,8 @@ jobs:
     - name: Activate virtual environment and install dependencies (Windows)
       if: matrix.platform == 'windows'
       run: |
-        crypto_env\Scripts\activate
-        pip install --upgrade pip
-        pip install PyQt5 matplotlib numpy requests pyinstaller
+        crypto_env\Scripts\python.exe -m pip install --upgrade pip
+        crypto_env\Scripts\python.exe -m pip install PyQt5 matplotlib numpy requests pyinstaller
         
     - name: Build binary (Linux)
       if: matrix.platform == 'linux'
@@ -69,8 +68,7 @@ jobs:
     - name: Build binary (Windows)
       if: matrix.platform == 'windows'
       run: |
-        crypto_env\Scripts\activate
-        pyinstaller --clean --onefile --windowed --name CryptoTracker crypto_gui.py
+        crypto_env\Scripts\python.exe -m PyInstaller --clean --onefile --windowed --name CryptoTracker crypto_gui.py
         
     - name: Create packages (Linux)
       if: matrix.platform == 'linux'
