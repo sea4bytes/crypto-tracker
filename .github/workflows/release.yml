@@ -10,8 +10,21 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            binary_name: CryptoTracker
+            package_suffix: linux-x64
+          - os: windows-latest
+            platform: windows
+            binary_name: CryptoTracker.exe
+            package_suffix: windows-x64
+    
+    runs-on: ${{ matrix.os }}
     
     steps:
     - uses: actions/checkout@v4
@@ -21,7 +34,8 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Install system dependencies
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y libxcb-xinerama0 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-util1 libxkbcommon-x11-0 libegl1 libgl1-mesa-dri
@@ -29,25 +43,80 @@ jobs:
         
     - name: Create virtual environment
       run: |
-        python3 -m venv crypto_env
-        source crypto_env/bin/activate
-        pip install --upgrade pip
+        python -m venv crypto_env
         
-    - name: Install dependencies
+    - name: Activate virtual environment and install dependencies (Linux)
+      if: matrix.platform == 'linux'
       run: |
         source crypto_env/bin/activate
+        pip install --upgrade pip
         pip install PyQt5 matplotlib numpy requests pyinstaller
         
-    - name: Build binary
+    - name: Activate virtual environment and install dependencies (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        crypto_env\Scripts\activate
+        pip install --upgrade pip
+        pip install PyQt5 matplotlib numpy requests pyinstaller
+        
+    - name: Build binary (Linux)
+      if: matrix.platform == 'linux'
       run: |
         source crypto_env/bin/activate
         chmod +x build_binary.sh
         xvfb-run -a ./build_binary.sh
         
-    - name: Create packages
+    - name: Build binary (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        crypto_env\Scripts\activate
+        pyinstaller --clean --onefile --windowed --name CryptoTracker crypto_gui.py
+        
+    - name: Create packages (Linux)
+      if: matrix.platform == 'linux'
       run: |
         chmod +x package_releases.sh
         ./package_releases.sh
+        
+    - name: Create packages (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        # Create Windows package structure
+        mkdir CryptoTracker-Portable-Windows
+        copy dist\CryptoTracker.exe CryptoTracker-Portable-Windows\
+        echo @echo off > CryptoTracker-Portable-Windows\CryptoTracker.bat
+        echo start CryptoTracker.exe >> CryptoTracker-Portable-Windows\CryptoTracker.bat
+        
+        # Create zip package
+        powershell Compress-Archive -Path "CryptoTracker-Portable-Windows\*" -DestinationPath "CryptoTracker-Portable-Windows.zip"
+        
+        # Create packages directory
+        mkdir packages
+        copy CryptoTracker-Portable-Windows.zip packages\
+        copy dist\CryptoTracker.exe packages\CryptoTracker-windows-x64.exe
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: crypto-tracker-${{ matrix.platform }}
+        path: |
+          packages/
+        
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: crypto-tracker-linux
+        path: linux-packages/
+        
+    - name: Download Windows artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: crypto-tracker-windows
+        path: windows-packages/
         
     - name: Get version from tag
       id: get_version
@@ -64,8 +133,15 @@ jobs:
           ## 🚀 Crypto Currency Price Tracker Release ${{ steps.get_version.outputs.VERSION }}
           
           ### 📦 Downloads
+          
+          **🐧 Linux:**
           - **CryptoTracker-Portable-Linux.tar.gz**: Full portable package with launcher
           - **CryptoTracker-portable-linux-x64.tar.gz**: Binary only package
+          - **install.sh**: Installation script
+          
+          **🪟 Windows:**
+          - **CryptoTracker-Portable-Windows.zip**: Full portable package with launcher
+          - **CryptoTracker-windows-x64.exe**: Standalone executable
           
           ### ✨ Features
           - Real-time cryptocurrency price tracking (17+ coins)
@@ -75,6 +151,8 @@ jobs:
           - Premium dark theme with modern UI
           
           ### 🔧 Installation
+          
+          **Linux:**
           ```bash
           # Download and extract
           tar -xzf CryptoTracker-Portable-Linux.tar.gz
@@ -84,17 +162,24 @@ jobs:
           ./CryptoTracker
           ```
           
+          **Windows:**
+          ```cmd
+          # Download and extract CryptoTracker-Portable-Windows.zip
+          # Double-click CryptoTracker.exe or CryptoTracker.bat
+          ```
+          
           ### 📋 Requirements
-          - Linux x64 system
-          - Graphics display (X11 or Wayland)
-          - Internet connection for data
-          - **No Python or dependencies required!**
+          - **Linux**: x64 system, graphics display (X11/Wayland), internet connection
+          - **Windows**: Windows 10+ x64, internet connection
+          - **No Python or dependencies required for either platform!**
           
           ### 🐛 Bug Fixes & Improvements
           See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
         files: |
-          ./packages/CryptoTracker-Portable-Linux.tar.gz
-          ./packages/CryptoTracker-portable-linux-x64.tar.gz
-          ./packages/install.sh
+          linux-packages/CryptoTracker-Portable-Linux.tar.gz
+          linux-packages/CryptoTracker-portable-linux-x64.tar.gz
+          linux-packages/install.sh
+          windows-packages/CryptoTracker-Portable-Windows.zip
+          windows-packages/CryptoTracker-windows-x64.exe
         draft: false
         prerelease: false
