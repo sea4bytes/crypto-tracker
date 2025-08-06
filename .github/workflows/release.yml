@@ -6,6 +6,10 @@ on:
       - 'v*'  # Trigger on version tags like v1.0.0
   workflow_dispatch:  # Allow manual trigger
 
+permissions:
+  contents: write
+  releases: write
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -51,13 +55,12 @@ jobs:
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
       
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.get_version.outputs.VERSION }}
-        release_name: Crypto Tracker ${{ steps.get_version.outputs.VERSION }}
+        name: Crypto Tracker ${{ steps.get_version.outputs.VERSION }}
         body: |
           ## 🚀 Crypto Currency Price Tracker Release ${{ steps.get_version.outputs.VERSION }}
           
@@ -90,36 +93,9 @@ jobs:
           
           ### 🐛 Bug Fixes & Improvements
           See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
-          
+        files: |
+          ./packages/CryptoTracker-Portable-Linux.tar.gz
+          ./packages/CryptoTracker-portable-linux-x64.tar.gz
+          ./packages/install.sh
         draft: false
         prerelease: false
-        
-    - name: Upload Portable Package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./packages/CryptoTracker-Portable-Linux.tar.gz
-        asset_name: CryptoTracker-Portable-Linux.tar.gz
-        asset_content_type: application/gzip
-        
-    - name: Upload Binary Package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./packages/CryptoTracker-portable-linux-x64.tar.gz
-        asset_name: CryptoTracker-portable-linux-x64.tar.gz
-        asset_content_type: application/gzip
-        
-    - name: Upload Installer Script
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./packages/install.sh
-        asset_name: install.sh
-        asset_content_type: application/x-sh
