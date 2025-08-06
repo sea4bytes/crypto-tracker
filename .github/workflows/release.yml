@@ -1,0 +1,126 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pyqt5 python3-pyqt5.qtcore python3-pyqt5.qtgui python3-pyqt5.qtwidgets
+        sudo apt-get install -y xvfb  # For headless testing
+        
+    - name: Create virtual environment
+      run: |
+        python3 -m venv crypto_env
+        source crypto_env/bin/activate
+        pip install --upgrade pip
+        
+    - name: Install dependencies
+      run: |
+        source crypto_env/bin/activate
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Build binary
+      run: |
+        source crypto_env/bin/activate
+        chmod +x build_binary.sh
+        xvfb-run -a ./build_binary.sh
+        
+    - name: Create packages
+      run: |
+        chmod +x package_releases.sh
+        ./package_releases.sh
+        
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        release_name: Crypto Tracker ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## 🚀 Crypto Currency Price Tracker Release ${{ steps.get_version.outputs.VERSION }}
+          
+          ### 📦 Downloads
+          - **CryptoTracker-Portable-Linux.tar.gz**: Full portable package with launcher
+          - **CryptoTracker-portable-linux-x64.tar.gz**: Binary only package
+          
+          ### ✨ Features
+          - Real-time cryptocurrency price tracking (17+ coins)
+          - Interactive price history charts
+          - Exchange fee calculator with custom amounts
+          - AI-powered trading suggestions
+          - Premium dark theme with modern UI
+          
+          ### 🔧 Installation
+          ```bash
+          # Download and extract
+          tar -xzf CryptoTracker-Portable-Linux.tar.gz
+          cd CryptoTracker-Portable
+          
+          # Run directly
+          ./CryptoTracker
+          ```
+          
+          ### 📋 Requirements
+          - Linux x64 system
+          - Graphics display (X11 or Wayland)
+          - Internet connection for data
+          - **No Python or dependencies required!**
+          
+          ### 🐛 Bug Fixes & Improvements
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          
+        draft: false
+        prerelease: false
+        
+    - name: Upload Portable Package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./packages/CryptoTracker-Portable-Linux.tar.gz
+        asset_name: CryptoTracker-Portable-Linux.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload Binary Package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./packages/CryptoTracker-portable-linux-x64.tar.gz
+        asset_name: CryptoTracker-portable-linux-x64.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload Installer Script
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./packages/install.sh
+        asset_name: install.sh
+        asset_content_type: application/x-sh
