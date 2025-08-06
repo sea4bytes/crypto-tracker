@@ -96,24 +96,23 @@ jobs:
         copy dist\CryptoTracker.exe packages\CryptoTracker-windows-x64.exe
         
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: crypto-tracker-${{ matrix.platform }}
-        path: |
-          packages/
+        path: packages/
         
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
     - name: Download Linux artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: crypto-tracker-linux
         path: linux-packages/
         
     - name: Download Windows artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: crypto-tracker-windows
         path: windows-packages/
